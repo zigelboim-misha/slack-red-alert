@@ -8,10 +8,7 @@ Updates your Slack status when a red alert (Tzeva Adom) fires in your area.
 
 ## How it works
 
-Two alert sources run in parallel:
-
-- **Tzofar WebSocket** - persistent connection to `wss://ws.tzevaadom.co.il`, alerts pushed in real-time
-- **Pikud HaOref polling** — polls `oref.org.il` every 10 seconds (configurable) as a fallback (requires Israeli IP)
+Connects to the Tzofar WebSocket (`wss://ws.tzevaadom.co.il`) for real-time push alerts — no geo-restriction, no polling, works from anywhere.
 
 When an alert matches your configured cities, a random status message is set on Slack. The status auto-clears 2 minutes after the last alert, with a 10-minute Slack-side expiry as a safety net.
 
@@ -51,7 +48,6 @@ source .env && ./slack-red-alert
 | `SLACK_TOKEN` | Yes | — | Slack user OAuth token (`xoxp-...`) |
 | `ALERT_CITIES` | No | `תל אביב,גבעתיים,רמת גן` | Comma-separated city prefixes in Hebrew |
 | `ALERT_STATUS_TEXTS` | No | 7 built-in messages | Pipe-separated status messages, random one picked per alert |
-| `POLL_INTERVAL_SECONDS` | No | `10` | Pikud HaOref polling interval in seconds |
 | `PORT` | No | `8080` | Health server port (set automatically by Render) |
 
 ### Default status messages
@@ -87,5 +83,4 @@ The app includes a built-in health server so it can run as a free Web Service on
 
 ## Infrastructure note
 
-This needs to run on an always-on machine — if your device sleeps, the process suspends and you'll miss alerts.
-A cheap VPS or a Raspberry Pi at home works well. If you have an Israeli IP, the Pikud HaOref polling is more reliable as a backup when the Tzofar WebSocket connection drops.
+This needs to run on an always-on machine — if your device sleeps, the process suspends and you'll miss alerts. Render's free tier with a ping bot (see above) is the easiest option.

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -36,13 +35,9 @@ func main() {
 
 	slackStatus := status.NewSlackStatus(slackToken)
 
-	// Start both sources — WebSocket is primary, polling is fallback.
+	// Start Tzofar WebSocket for real-time alerts.
 	tzofar := alert.NewTzofarWS()
 	defer tzofar.Close()
-
-	pollInterval := parsePollInterval(os.Getenv("POLL_INTERVAL_SECONDS"))
-	oref := alert.NewOrefPoller(pollInterval)
-	defer oref.Close()
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
@@ -53,12 +48,7 @@ func main() {
 	for {
 		select {
 		case a := <-tzofar.Alerts():
-			if matchesCities(a, cities) {
-				alertActive = setAlertStatus(slackStatus, statusMessages, alertActive)
-				clearTimer = resetClearTimer(clearTimer)
-			}
-
-		case a := <-oref.Alerts():
+			log.Printf("[alert] received: cat=%s title=%s cities=%v", a.Cat, a.Title, a.Data)
 			if matchesCities(a, cities) {
 				alertActive = setAlertStatus(slackStatus, statusMessages, alertActive)
 				clearTimer = resetClearTimer(clearTimer)
@@ -153,18 +143,6 @@ func startHealthServer() {
 	})
 	go http.ListenAndServe(":"+port, nil)
 	log.Printf("Health server listening on :%s", port)
-}
-
-func parsePollInterval(env string) time.Duration {
-	if env == "" {
-		return 10 * time.Second
-	}
-	secs, err := strconv.Atoi(env)
-	if err != nil || secs < 1 {
-		log.Printf("Invalid POLL_INTERVAL_SECONDS=%q, using default 10s", env)
-		return 10 * time.Second
-	}
-	return time.Duration(secs) * time.Second
 }
 
 func resetClearTimer(existing *time.Timer) *time.Timer {
