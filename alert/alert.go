@@ -2,11 +2,9 @@ package alert
 
 // Alert represents a red alert event from Tzofar.
 type Alert struct {
-	ID    string   `json:"id"`
-	Cat   string   `json:"cat"`
-	Title string   `json:"title"`
-	Data  []string `json:"data"`
-	Desc  string   `json:"desc"`
+	Threat  int      `json:"threat"`
+	IsDrill bool     `json:"isDrill"`
+	Cities  []string `json:"cities"`
 }
 
 // Source delivers alerts on a channel.

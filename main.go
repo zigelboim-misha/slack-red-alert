@@ -92,9 +92,9 @@ func parseCities(env string) []string {
 }
 
 func matchesCities(a alert.Alert, cities []string) bool {
-	for _, area := range a.Data {
+	for _, alertCity := range a.Cities {
 		for _, city := range cities {
-			if strings.Contains(area, city) {
+			if strings.Contains(alertCity, city) {
 				return true
 			}
 		}

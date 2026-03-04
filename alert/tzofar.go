@@ -85,6 +85,25 @@ func (t *TzofarWS) connect() (bool, error) {
 	defer conn.Close()
 
 	log.Println("[tzofar] connected")
+
+	// Log connection status periodically.
+	statusDone := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				log.Println("[tzofar] still connected")
+			case <-statusDone:
+				return
+			case <-t.done:
+				return
+			}
+		}
+	}()
+	defer close(statusDone)
+
 	// Start pinger.
 	pingDone := make(chan struct{})
 	go func() {
@@ -133,17 +152,20 @@ func (t *TzofarWS) connect() (bool, error) {
 
 		switch envelope.Type {
 		case "ALERT":
-			log.Printf("[tzofar] raw alert data: %s", string(envelope.Data))
 			var a Alert
 			if err := json.Unmarshal(envelope.Data, &a); err != nil {
 				log.Printf("[tzofar] failed to parse alert data: %s", string(envelope.Data))
 				continue
 			}
-			if len(a.Data) == 0 {
+			if a.IsDrill {
+				log.Printf("[tzofar] drill alert, skipping")
+				continue
+			}
+			if len(a.Cities) == 0 {
 				log.Printf("[tzofar] alert has no cities, skipping")
 				continue
 			}
-			log.Printf("[tzofar] alert: cat=%s title=%s cities=%v", a.Cat, a.Title, a.Data)
+			log.Printf("[tzofar] alert: threat=%d cities=%v", a.Threat, a.Cities)
 			select {
 			case t.ch <- a:
 			default:
