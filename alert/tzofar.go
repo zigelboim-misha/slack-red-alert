@@ -133,12 +133,14 @@ func (t *TzofarWS) connect() (bool, error) {
 
 		switch envelope.Type {
 		case "ALERT":
+			log.Printf("[tzofar] raw alert data: %s", string(envelope.Data))
 			var a Alert
 			if err := json.Unmarshal(envelope.Data, &a); err != nil {
 				log.Printf("[tzofar] failed to parse alert data: %s", string(envelope.Data))
 				continue
 			}
 			if len(a.Data) == 0 {
+				log.Printf("[tzofar] alert has no cities, skipping")
 				continue
 			}
 			log.Printf("[tzofar] alert: cat=%s title=%s cities=%v", a.Cat, a.Title, a.Data)
