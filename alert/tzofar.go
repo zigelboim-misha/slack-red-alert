@@ -3,6 +3,7 @@ package alert
 import (
 	"encoding/json"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -50,24 +51,30 @@ func (t *TzofarWS) loop() {
 		err := t.connect()
 		if err != nil {
 			log.Printf("[tzofar] connection error: %v, reconnecting in %v", err, delay)
-		}
-
-		select {
-		case <-t.done:
-			return
-		case <-time.After(delay):
-		}
-
-		// Exponential backoff capped at maxReconnect.
-		delay = delay * 2
-		if delay > maxReconnect {
-			delay = maxReconnect
+			// Exponential backoff capped at maxReconnect.
+			nextDelay := delay * 2
+			if nextDelay > maxReconnect {
+				nextDelay = maxReconnect
+			}
+			select {
+			case <-t.done:
+				return
+			case <-time.After(delay):
+			}
+			delay = nextDelay
+		} else {
+			// Connection was established then dropped — reset backoff.
+			delay = reconnectDelay
 		}
 	}
 }
 
 func (t *TzofarWS) connect() error {
-	conn, _, err := websocket.DefaultDialer.Dial(tzofarURL, nil)
+	headers := http.Header{}
+	headers.Set("Origin", "https://www.tzevaadom.co.il")
+	headers.Set("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+
+	conn, _, err := websocket.DefaultDialer.Dial(tzofarURL, headers)
 	if err != nil {
 		return err
 	}
