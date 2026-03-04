@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/red-alert-icon.png" alt="Red Alert" width="128">
+</p>
+
 # slack-red-alert
 
 Updates your Slack status when a red alert (Tzeva Adom) fires in your area.
