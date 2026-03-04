@@ -48,16 +48,21 @@ func main() {
 	for {
 		select {
 		case a := <-tzofar.Alerts():
-			log.Printf("[alert] received: cat=%s title=%s cities=%v", a.Cat, a.Title, a.Data)
 			if matchesCities(a, cities) {
+				log.Printf("[alert] matches monitored cities, setting Slack status")
 				alertActive = setAlertStatus(slackStatus, statusMessages, alertActive)
 				clearTimer = resetClearTimer(clearTimer)
+			} else {
+				log.Printf("[alert] no city match, skipping")
 			}
 
 		case <-timerChan(clearTimer):
 			if alertActive {
+				log.Printf("[slack] clearing status after %v timeout", clearDelay)
 				if err := slackStatus.Clear(); err != nil {
-					log.Printf("Failed to clear status: %v", err)
+					log.Printf("[slack] failed to clear status: %v", err)
+				} else {
+					log.Printf("[slack] status cleared successfully")
 				}
 				alertActive = false
 			}
@@ -122,13 +127,16 @@ func parseStatusMessages(env string) []string {
 
 func setAlertStatus(s *status.SlackStatus, messages []string, alreadyActive bool) bool {
 	if alreadyActive {
+		log.Printf("[slack] status already active, keeping current")
 		return true
 	}
 	text := messages[rand.Intn(len(messages))]
+	log.Printf("[slack] setting status: %q", text)
 	if err := s.SetAlert(text); err != nil {
-		log.Printf("Failed to set status: %v", err)
+		log.Printf("[slack] failed to set status: %v", err)
 		return false
 	}
+	log.Printf("[slack] status set successfully")
 	return true
 }
 

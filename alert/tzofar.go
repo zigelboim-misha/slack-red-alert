@@ -117,8 +117,11 @@ func (t *TzofarWS) connect() (bool, error) {
 			return true, err
 		}
 
-		// Messages have an envelope with a "type" field. Only alert messages
-		// contain the fields we care about (cat, title, data).
+		// Skip empty keepalive frames.
+		if len(msg) == 0 {
+			continue
+		}
+
 		var envelope struct {
 			Type string          `json:"type"`
 			Data json.RawMessage `json:"data"`
@@ -128,25 +131,23 @@ func (t *TzofarWS) connect() (bool, error) {
 			continue
 		}
 
-		// Non-alert messages (e.g. SYSTEM_MESSAGE) are informational.
-		if envelope.Type != "" {
-			log.Printf("[tzofar] %s received", envelope.Type)
-			continue
-		}
-
-		var a Alert
-		if err := json.Unmarshal(msg, &a); err != nil {
-			log.Printf("[tzofar] ignoring unparseable message: %s", string(msg))
-			continue
-		}
-
-		if len(a.Data) == 0 {
-			continue
-		}
-
-		select {
-		case t.ch <- a:
+		switch envelope.Type {
+		case "ALERT":
+			var a Alert
+			if err := json.Unmarshal(envelope.Data, &a); err != nil {
+				log.Printf("[tzofar] failed to parse alert data: %s", string(envelope.Data))
+				continue
+			}
+			if len(a.Data) == 0 {
+				continue
+			}
+			log.Printf("[tzofar] alert: cat=%s title=%s cities=%v", a.Cat, a.Title, a.Data)
+			select {
+			case t.ch <- a:
+			default:
+			}
 		default:
+			log.Printf("[tzofar] %s received", envelope.Type)
 		}
 	}
 }
