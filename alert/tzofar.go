@@ -11,7 +11,7 @@ import (
 
 const (
 	tzofarURL      = "wss://ws.tzevaadom.co.il/socket?platform=ANDROID"
-	pingInterval   = 60 * time.Second
+	pingInterval   = 30 * time.Second
 	reconnectDelay = 10 * time.Second
 	maxReconnect   = 60 * time.Second
 )
@@ -48,41 +48,43 @@ func (t *TzofarWS) loop() {
 		default:
 		}
 
-		err := t.connect()
+		connected, err := t.connect()
 		if err != nil {
 			log.Printf("[tzofar] connection error: %v, reconnecting in %v", err, delay)
-			// Exponential backoff capped at maxReconnect.
-			nextDelay := delay * 2
-			if nextDelay > maxReconnect {
-				nextDelay = maxReconnect
-			}
+		}
+
+		if connected {
+			// Was connected then dropped — reset backoff.
+			delay = reconnectDelay
+		} else {
+			// Never connected — exponential backoff capped at maxReconnect.
 			select {
 			case <-t.done:
 				return
 			case <-time.After(delay):
 			}
-			delay = nextDelay
-		} else {
-			// Connection was established then dropped — reset backoff.
-			delay = reconnectDelay
+			if delay < maxReconnect {
+				delay = delay * 2
+				if delay > maxReconnect {
+					delay = maxReconnect
+				}
+			}
 		}
 	}
 }
 
-func (t *TzofarWS) connect() error {
+func (t *TzofarWS) connect() (bool, error) {
 	headers := http.Header{}
 	headers.Set("Origin", "https://www.tzevaadom.co.il")
 	headers.Set("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
 
 	conn, _, err := websocket.DefaultDialer.Dial(tzofarURL, headers)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer conn.Close()
 
 	log.Println("[tzofar] connected")
-
-	// Reset backoff on successful connection (handled by caller resetting delay after success).
 	// Start pinger.
 	pingDone := make(chan struct{})
 	go func() {
@@ -106,13 +108,30 @@ func (t *TzofarWS) connect() error {
 	for {
 		select {
 		case <-t.done:
-			return nil
+			return true, nil
 		default:
 		}
 
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			return err
+			return true, err
+		}
+
+		// Messages have an envelope with a "type" field. Only alert messages
+		// contain the fields we care about (cat, title, data).
+		var envelope struct {
+			Type string          `json:"type"`
+			Data json.RawMessage `json:"data"`
+		}
+		if err := json.Unmarshal(msg, &envelope); err != nil {
+			log.Printf("[tzofar] ignoring unparseable message: %s", string(msg))
+			continue
+		}
+
+		// Non-alert messages (e.g. SYSTEM_MESSAGE) are informational.
+		if envelope.Type != "" {
+			log.Printf("[tzofar] %s received", envelope.Type)
+			continue
 		}
 
 		var a Alert

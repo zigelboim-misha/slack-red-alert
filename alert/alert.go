@@ -1,6 +1,6 @@
 package alert
 
-// Alert represents a red alert event from Pikud HaOref or Tzofar.
+// Alert represents a red alert event from Tzofar.
 type Alert struct {
 	ID    string   `json:"id"`
 	Cat   string   `json:"cat"`
