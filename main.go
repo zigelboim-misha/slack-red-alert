@@ -7,17 +7,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/mishazigelboim/slack-red-alert/alert"
 	"github.com/mishazigelboim/slack-red-alert/status"
-)
-
-const (
-	// How long after the last alert to auto-clear the status.
-	clearDelay = 2 * time.Minute
 )
 
 func main() {
@@ -28,10 +24,12 @@ func main() {
 
 	cities := parseCities(os.Getenv("ALERT_CITIES"))
 	statusMessages := parseStatusMessages(os.Getenv("ALERT_STATUS_TEXTS"))
+	clearDelay := parseClearDelay(os.Getenv("ALERT_CLEAR_MINUTES"))
 
 	startHealthServer()
 
 	log.Printf("Monitoring cities: %v", cities)
+	log.Printf("Status clear delay: %v", clearDelay)
 
 	slackStatus := status.NewSlackStatus(slackToken)
 
@@ -51,7 +49,7 @@ func main() {
 			if matchesCities(a, cities) {
 				log.Printf("[alert] matches monitored cities, setting Slack status")
 				alertActive = setAlertStatus(slackStatus, statusMessages, alertActive)
-				clearTimer = resetClearTimer(clearTimer)
+				clearTimer = resetClearTimer(clearTimer, clearDelay)
 			} else {
 				log.Printf("[alert] no city match, skipping")
 			}
@@ -153,11 +151,23 @@ func startHealthServer() {
 	log.Printf("Health server listening on :%s", port)
 }
 
-func resetClearTimer(existing *time.Timer) *time.Timer {
+func parseClearDelay(env string) time.Duration {
+	if env == "" {
+		return 10 * time.Minute
+	}
+	mins, err := strconv.Atoi(env)
+	if err != nil || mins <= 0 {
+		log.Printf("Invalid ALERT_CLEAR_MINUTES=%q, using default 10", env)
+		return 10 * time.Minute
+	}
+	return time.Duration(mins) * time.Minute
+}
+
+func resetClearTimer(existing *time.Timer, delay time.Duration) *time.Timer {
 	if existing != nil {
 		existing.Stop()
 	}
-	return time.NewTimer(clearDelay)
+	return time.NewTimer(delay)
 }
 
 // timerChan returns the timer's channel, or a nil channel (blocks forever) if timer is nil.

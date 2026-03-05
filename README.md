@@ -10,7 +10,7 @@ Updates your Slack status when a red alert (Tzeva Adom) fires in your area.
 
 Connects to the Tzofar WebSocket (`wss://ws.tzevaadom.co.il`) for real-time push alerts — no geo-restriction, no polling, works from anywhere.
 
-When an alert matches your configured cities, a random status message is set on Slack. The status auto-clears 2 minutes after the last alert, with a 10-minute Slack-side expiry as a safety net.
+When an alert matches your configured cities, a random status message is set on Slack. The status auto-clears after a configurable delay (default 10 minutes) following the last alert, with a matching Slack-side expiry as a safety net.
 
 ## Setup
 
@@ -48,6 +48,7 @@ source .env && ./slack-red-alert
 | `SLACK_TOKEN` | Yes | — | Slack user OAuth token (`xoxp-...`) |
 | `ALERT_CITIES` | No | `תל אביב,גבעתיים,רמת גן` | Comma-separated city prefixes in Hebrew |
 | `ALERT_STATUS_TEXTS` | No | 7 built-in messages | Pipe-separated status messages, random one picked per alert |
+| `ALERT_CLEAR_MINUTES` | No | `10` | Minutes after last matching alert to auto-clear status |
 | `PORT` | No | `8080` | Health server port (set automatically by Render) |
 
 ### Default status messages
